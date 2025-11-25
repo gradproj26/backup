@@ -1,26 +1,34 @@
 package com.example.offlineroutingapp
 
+import android.app.AlertDialog
+import android.content.Context
 import android.graphics.BitmapFactory
 import android.util.Base64
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
-import android.app.AlertDialog
-import android.content.Context
 
-class MessageAdapter(private val messages: List<Message>) :
-    RecyclerView.Adapter<MessageAdapter.MessageViewHolder>() {
+class MessageAdapter(
+    private val messages: List<Message>,
+    private val onRetryClick: ((Message) -> Unit)? = null
+) : RecyclerView.Adapter<MessageAdapter.MessageViewHolder>() {
 
     class MessageViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val messageText: TextView = itemView.findViewById(R.id.messageText)
         val messageImage: ImageView = itemView.findViewById(R.id.messageImage)
         val messageContainer: LinearLayout = itemView.findViewById(R.id.messageContainer)
         val messageStatus: TextView = itemView.findViewById(R.id.messageStatus)
+        val retryButton: ImageButton? = try {
+            itemView.findViewById(R.id.retryButton)
+        } catch (e: Exception) {
+            null
+        }
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MessageViewHolder {
@@ -32,6 +40,7 @@ class MessageAdapter(private val messages: List<Message>) :
     override fun onBindViewHolder(holder: MessageViewHolder, position: Int) {
         val message = messages[position]
 
+        // Handle image messages
         if (message.isImage && !message.imageData.isNullOrEmpty()) {
             holder.messageText.visibility = View.GONE
             holder.messageImage.visibility = View.VISIBLE
@@ -41,7 +50,6 @@ class MessageAdapter(private val messages: List<Message>) :
                 val bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
                 holder.messageImage.setImageBitmap(bitmap)
 
-                // Make image clickable to view fullscreen
                 holder.messageImage.setOnClickListener {
                     showFullscreenImage(holder.itemView.context, imageBytes)
                 }
@@ -58,9 +66,11 @@ class MessageAdapter(private val messages: List<Message>) :
                 holder.messageImage.setBackgroundResource(R.drawable.bg_message_received)
             }
         } else {
+            // Handle text messages
             holder.messageText.visibility = View.VISIBLE
             holder.messageImage.visibility = View.GONE
             holder.messageText.text = message.text
+
             if (message.isSentByMe) {
                 holder.messageContainer.gravity = Gravity.END
                 holder.messageText.setBackgroundResource(R.drawable.bg_message_sent)
@@ -70,15 +80,33 @@ class MessageAdapter(private val messages: List<Message>) :
             }
         }
 
+        // Handle message status and retry button
         if (message.isSentByMe) {
             holder.messageStatus.visibility = View.VISIBLE
-            holder.messageStatus.text = when {
-                message.isSeen -> "✓✓ Seen"
-                message.isDelivered -> "✓✓ Delivered"
-                else -> "✓ Sent"
+
+            if (message.isFailed) {
+                holder.messageStatus.text = "❌ Failed"
+                holder.messageStatus.setTextColor(
+                    holder.itemView.context.getColor(android.R.color.holo_red_dark)
+                )
+                holder.retryButton?.visibility = View.VISIBLE
+                holder.retryButton?.setOnClickListener {
+                    onRetryClick?.invoke(message)
+                }
+            } else {
+                holder.retryButton?.visibility = View.GONE
+                holder.messageStatus.setTextColor(
+                    holder.itemView.context.getColor(android.R.color.darker_gray)
+                )
+                holder.messageStatus.text = when {
+                    message.isSeen -> "✓✓ Seen"
+                    message.isDelivered -> "✓✓ Delivered"
+                    else -> "✓ Sent"
+                }
             }
         } else {
             holder.messageStatus.visibility = View.GONE
+            holder.retryButton?.visibility = View.GONE
         }
     }
 

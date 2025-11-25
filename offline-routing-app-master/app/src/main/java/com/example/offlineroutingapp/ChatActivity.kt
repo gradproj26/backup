@@ -5,8 +5,10 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.*
+import android.util.Base64
 import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -14,11 +16,10 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.offlineroutingapp.data.AppDatabase
 import com.example.offlineroutingapp.data.entities.MessageEntity
 import com.example.offlineroutingapp.service.WifiDirectService
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.io.ByteArrayOutputStream
 import java.io.File
-
-
 
 class ChatActivity : AppCompatActivity() {
     private lateinit var messagesRecyclerView: RecyclerView
@@ -54,6 +55,12 @@ class ChatActivity : AppCompatActivity() {
 
             wifiService?.onMessageReceived = { text, isImage, imageData ->
                 handleReceivedMessage(text, isImage, imageData)
+            }
+
+            wifiService?.onConnectionStatusChanged = { connected ->
+                runOnUiThread {
+                    // Update UI based on connection status
+                }
             }
         }
 
@@ -108,7 +115,12 @@ class ChatActivity : AppCompatActivity() {
     }
 
     private fun setupRecyclerView() {
-        messageAdapter = MessageAdapter(messages)
+        messageAdapter = MessageAdapter(
+            messages = messages,
+            onRetryClick = { message ->
+                retryMessage(message)
+            }
+        )
         messagesRecyclerView.adapter = messageAdapter
         messagesRecyclerView.layoutManager = LinearLayoutManager(this)
     }
@@ -120,13 +132,16 @@ class ChatActivity : AppCompatActivity() {
                     messages.clear()
                     messages.addAll(messageEntities.map { entity ->
                         Message(
+                            id = entity.id,
                             text = entity.text,
                             isSentByMe = entity.isSentByMe,
                             timestamp = entity.timestamp,
                             isImage = entity.isImage,
                             imageData = entity.imageData,
                             isDelivered = entity.isDelivered,
-                            isSeen = entity.isSeen
+                            isSeen = entity.isSeen,
+                            isFailed = !entity.isDelivered && entity.isSentByMe &&
+                                    (System.currentTimeMillis() - entity.timestamp > 30000)
                         )
                     })
                     messageAdapter.notifyDataSetChanged()
@@ -156,85 +171,108 @@ class ChatActivity : AppCompatActivity() {
 
     private fun sendMessage() {
         val messageText = messageInput.text.toString().trim()
-        if (messageText.isNotEmpty()) {
-            if (wifiService?.isConnected == true) {
-                wifiService?.sendMessage(messageText)
+        if (messageText.isEmpty()) return
 
-                chatId?.let { id ->
-                    lifecycleScope.launch {
-                        val message = MessageEntity(
-                            chatId = id,
-                            text = messageText,
-                            isSentByMe = true
+        if (wifiService?.isConnected == true) {
+            wifiService?.sendMessage(messageText)
+
+            chatId?.let { id ->
+                lifecycleScope.launch {
+                    val message = MessageEntity(
+                        chatId = id,
+                        text = messageText,
+                        isSentByMe = true,
+                        isDelivered = false
+                    )
+                    database.messageDao().insertMessage(message)
+
+                    val chat = database.chatDao().getChatById(id)
+                    chat?.let {
+                        val updatedChat = it.copy(
+                            lastMessage = messageText,
+                            lastMessageTime = System.currentTimeMillis()
                         )
-                        database.messageDao().insertMessage(message)
-
-                        val chat = database.chatDao().getChatById(id)
-                        chat?.let {
-                            val updatedChat = it.copy(
-                                lastMessage = messageText,
-                                lastMessageTime = System.currentTimeMillis()
-                            )
-                            database.chatDao().updateChat(updatedChat)
-                        }
+                        database.chatDao().updateChat(updatedChat)
                     }
                 }
-
-                messageInput.text.clear()
-            } else {
-                Toast.makeText(this, "Not connected. Go to Discover tab to connect.", Toast.LENGTH_SHORT).show()
             }
+
+            messageInput.text.clear()
+        } else {
+            Toast.makeText(
+                this,
+                "Not connected. Message saved for retry.",
+                Toast.LENGTH_SHORT
+            ).show()
+
+            chatId?.let { id ->
+                lifecycleScope.launch {
+                    val message = MessageEntity(
+                        chatId = id,
+                        text = messageText,
+                        isSentByMe = true,
+                        isDelivered = false
+                    )
+                    database.messageDao().insertMessage(message)
+                }
+            }
+            messageInput.text.clear()
         }
     }
 
     private fun sendImage(uri: Uri) {
-        if (wifiService?.isConnected == true) {
-            lifecycleScope.launch {
-                try {
-                    val inputStream = contentResolver.openInputStream(uri)
-                    val bitmap = BitmapFactory.decodeStream(inputStream)
-                    inputStream?.close()
+        if (wifiService?.isConnected != true) {
+            Toast.makeText(this, "Not connected. Cannot send images.", Toast.LENGTH_SHORT).show()
+            return
+        }
 
-                    val compressedBitmap = compressImage(bitmap)
-                    val byteArrayOutputStream = ByteArrayOutputStream()
-                    compressedBitmap.compress(Bitmap.CompressFormat.JPEG, 70, byteArrayOutputStream)
-                    val imageBytes = byteArrayOutputStream.toByteArray()
+        lifecycleScope.launch {
+            try {
+                val inputStream = contentResolver.openInputStream(uri)
+                val bitmap = BitmapFactory.decodeStream(inputStream)
+                inputStream?.close()
 
-                    wifiService?.sendImage(imageBytes)
+                val compressedBitmap = compressImage(bitmap)
+                val byteArrayOutputStream = ByteArrayOutputStream()
+                compressedBitmap.compress(Bitmap.CompressFormat.JPEG, 70, byteArrayOutputStream)
+                val imageBytes = byteArrayOutputStream.toByteArray()
 
-                    chatId?.let { id ->
-                        val base64Image = android.util.Base64.encodeToString(imageBytes, android.util.Base64.NO_WRAP)
-                        val message = MessageEntity(
-                            chatId = id,
-                            text = "",
-                            isSentByMe = true,
-                            isImage = true,
-                            imageData = base64Image
+                wifiService?.sendImage(imageBytes)
+
+                chatId?.let { id ->
+                    val base64Image = Base64.encodeToString(imageBytes, Base64.NO_WRAP)
+                    val message = MessageEntity(
+                        chatId = id,
+                        text = "",
+                        isSentByMe = true,
+                        isImage = true,
+                        imageData = base64Image,
+                        isDelivered = false
+                    )
+                    database.messageDao().insertMessage(message)
+
+                    val chat = database.chatDao().getChatById(id)
+                    chat?.let {
+                        val updatedChat = it.copy(
+                            lastMessage = "📷 Image",
+                            lastMessageTime = System.currentTimeMillis()
                         )
-                        database.messageDao().insertMessage(message)
-
-                        val chat = database.chatDao().getChatById(id)
-                        chat?.let {
-                            val updatedChat = it.copy(
-                                lastMessage = "📷 Image",
-                                lastMessageTime = System.currentTimeMillis()
-                            )
-                            database.chatDao().updateChat(updatedChat)
-                        }
+                        database.chatDao().updateChat(updatedChat)
                     }
-                } catch (e: Exception) {
-                    Toast.makeText(this@ChatActivity, "Failed to send image", Toast.LENGTH_SHORT).show()
                 }
+            } catch (e: Exception) {
+                Toast.makeText(this@ChatActivity, "Failed to send image", Toast.LENGTH_SHORT).show()
             }
-        } else {
-            Toast.makeText(this, "Not connected. Go to Discover tab to connect.", Toast.LENGTH_SHORT).show()
         }
     }
 
     private fun compressImage(bitmap: Bitmap): Bitmap {
         val maxWidth = 800
         val maxHeight = 600
-        val scaleFactor = minOf(maxWidth.toFloat() / bitmap.width, maxHeight.toFloat() / bitmap.height)
+        val scaleFactor = minOf(
+            maxWidth.toFloat() / bitmap.width,
+            maxHeight.toFloat() / bitmap.height
+        )
         return if (scaleFactor < 1.0f) {
             Bitmap.createScaledBitmap(
                 bitmap,
@@ -245,6 +283,39 @@ class ChatActivity : AppCompatActivity() {
         } else bitmap
     }
 
+    private fun retryMessage(message: Message) {
+        if (wifiService?.isConnected != true) {
+            Toast.makeText(this, "Cannot retry: Not connected", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Retry Message")
+            .setMessage("Do you want to resend this message?")
+            .setPositiveButton("Retry") { _, _ ->
+                if (message.isImage && message.imageData != null) {
+                    val imageBytes = Base64.decode(message.imageData, Base64.NO_WRAP)
+                    wifiService?.sendImage(imageBytes)
+                } else {
+                    wifiService?.sendMessage(message.text)
+                }
+
+                lifecycleScope.launch {
+                    chatId?.let { id ->
+                        val messages = database.messageDao().getMessagesByChatId(id).first()
+                        val dbMessage = messages.find { it.id == message.id }
+                        dbMessage?.let {
+                            database.messageDao().updateMessage(it.copy(isDelivered = true))
+                        }
+                    }
+                }
+
+                Toast.makeText(this, "Message resent", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
     private fun handleReceivedMessage(text: String, isImage: Boolean, imageData: String?) {
         chatId?.let { id ->
             lifecycleScope.launch {
@@ -253,9 +324,19 @@ class ChatActivity : AppCompatActivity() {
                     text = text,
                     isSentByMe = false,
                     isImage = isImage,
-                    imageData = imageData
+                    imageData = imageData,
+                    isDelivered = true
                 )
                 database.messageDao().insertMessage(message)
+
+                val chat = database.chatDao().getChatById(id)
+                chat?.let {
+                    val updatedChat = it.copy(
+                        lastMessage = if (isImage) "📷 Image" else text,
+                        lastMessageTime = System.currentTimeMillis()
+                    )
+                    database.chatDao().updateChat(updatedChat)
+                }
             }
         }
     }

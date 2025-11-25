@@ -8,7 +8,8 @@
         android:id="@+id/chatsRecyclerView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:padding="8dp" />
+        android:padding="8dp"
+        android:clipToPadding="false" />
 
     <!-- Empty state message -->
     <TextView
@@ -20,6 +21,7 @@
         android:textSize="16sp"
         android:textColor="#757575"
         android:gravity="center"
-        android:visibility="gone" />
+        android:padding="24dp"
+        android:visibility="visible" />
 
 </RelativeLayout>

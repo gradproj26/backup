@@ -1,6 +1,7 @@
 package com.example.offlineroutingapp.adapters
 
 import android.graphics.BitmapFactory
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -39,17 +40,49 @@ class ChatListAdapter(
     override fun onBindViewHolder(holder: ChatViewHolder, position: Int) {
         val chat = getItem(position)
 
-        holder.userName.text = chat.userName
+        // Set user name
+        holder.userName.text = if (chat.userName == "Connecting...") {
+            "Loading..."
+        } else {
+            chat.userName
+        }
+
+        // Set last message
         holder.lastMessage.text = chat.lastMessage.ifEmpty { "No messages yet" }
+
+        // Set timestamp
         holder.timestamp.text = formatTimestamp(chat.lastMessageTime)
 
-        // Load profile photo if available
-        if (!chat.userProfilePhoto.isNullOrEmpty() && File(chat.userProfilePhoto).exists()) {
-            val bitmap = BitmapFactory.decodeFile(chat.userProfilePhoto)
-            holder.profileImage.setImageBitmap(bitmap)
+        // Load profile photo
+        Log.d("ChatListAdapter", "Loading photo for ${chat.userName}, path: ${chat.userProfilePhoto}")
+
+        if (!chat.userProfilePhoto.isNullOrEmpty()) {
+            val file = File(chat.userProfilePhoto)
+            if (file.exists()) {
+                try {
+                    val bitmap = BitmapFactory.decodeFile(chat.userProfilePhoto)
+                    if (bitmap != null) {
+                        holder.profileImage.setImageBitmap(bitmap)
+                        Log.d("ChatListAdapter", "Successfully loaded photo for ${chat.userName}")
+                    } else {
+                        holder.profileImage.setImageResource(android.R.drawable.ic_menu_camera)
+                        Log.w("ChatListAdapter", "Bitmap is null for ${chat.userName}")
+                    }
+                } catch (e: Exception) {
+                    Log.e("ChatListAdapter", "Error loading photo: ${e.message}")
+                    holder.profileImage.setImageResource(android.R.drawable.ic_menu_camera)
+                }
+            } else {
+                Log.w("ChatListAdapter", "Photo file doesn't exist: ${chat.userProfilePhoto}")
+                holder.profileImage.setImageResource(android.R.drawable.ic_menu_camera)
+            }
         } else {
+            Log.d("ChatListAdapter", "No photo path for ${chat.userName}")
             holder.profileImage.setImageResource(android.R.drawable.ic_menu_camera)
         }
+
+        // Make profile image circular
+        holder.profileImage.clipToOutline = true
 
         // Show unread badge
         if (chat.unreadCount > 0) {

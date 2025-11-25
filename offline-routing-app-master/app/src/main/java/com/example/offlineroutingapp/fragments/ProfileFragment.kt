@@ -30,7 +30,7 @@ import java.io.File
 import java.io.FileOutputStream
 import android.graphics.Bitmap
 import android.util.Log
-
+import kotlinx.coroutines.delay
 class ProfileFragment : Fragment() {
     private lateinit var profileImage: ImageView
     private lateinit var userIdText: TextView

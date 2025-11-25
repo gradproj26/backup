@@ -24,8 +24,6 @@ import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
 import java.util.*
-import com.example.offlineroutingapp.nativebridge.MasaarBridge
-
 
 class RegistrationActivity : AppCompatActivity() {
     private lateinit var profileImageView: ImageView
@@ -68,15 +66,12 @@ class RegistrationActivity : AppCompatActivity() {
     }
 
     private fun generateUniqueId() {
+        // Generate unique ID: user_ + random UUID (first 8 chars)
         val uuid = UUID.randomUUID().toString().replace("-", "").substring(0, 8)
         generatedUserId = "user_$uuid"
         generatedIdText.text = "Your ID: $generatedUserId"
-
-        // Test the C++ bridge
-        MasaarBridge.setNodeId(generatedUserId)
-        val testMsg = MasaarBridge.buildMessage("Hello from Kotlin!", "user_test123")
-        android.util.Log.d("MasaarTest", "Generated message: $testMsg")
     }
+
     private fun setupListeners() {
         selectPhotoButton.setOnClickListener {
             if (hasStoragePermission()) {
@@ -126,7 +121,6 @@ class RegistrationActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             database.userDao().insertUser(user)
-            MasaarBridge.setNodeId(generatedUserId)
             Toast.makeText(this@RegistrationActivity, "Profile created successfully!", Toast.LENGTH_SHORT).show()
             navigateToMain()
         }

@@ -1,30 +1,47 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
-    package="com.example.offlineroutingapp">
+    xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Network and WiFi permissions -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Location permissions (required for WiFi Direct) -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
+    <!-- WiFi Direct permission for Android 13+ -->
     <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES"
         android:usesPermissionFlags="neverForLocation"
         tools:targetApi="tiramisu" />
-    <!-- Storage permissions for image access -->
+
+    <!-- Notification permissions -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <!-- Storage permissions -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"
         tools:targetApi="tiramisu" />
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"
-        tools:targetApi="tiramisu" />
-    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED"
-        tools:targetApi="upside_down_cake" />
+
+    <!-- Foreground service permissions -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
+    <!-- WiFi Direct hardware feature -->
     <uses-feature android:name="android.hardware.wifi.direct" android:required="true"/>
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Corrected Location Permission -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- For Android 12 (API 31) and higher -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES"
+        android:usesPermissionFlags="neverForLocation" />
 
     <application
         android:allowBackup="true"
@@ -34,6 +51,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.OfflineRoutingApp">
 
+        <!-- Registration Activity (Launch Screen) -->
         <activity
             android:name=".RegistrationActivity"
             android:exported="true">
@@ -43,24 +61,36 @@
             </intent-filter>
         </activity>
 
+        <!-- Main Activity with Tabs -->
         <activity
             android:name=".MainActivity"
-            android:exported="true"
+            android:exported="false"
             android:label="@string/app_name"
-            android:theme="@style/Theme.OfflineRoutingApp">
-        </activity>
+            android:theme="@style/Theme.OfflineRoutingApp" />
 
+        <!-- Chat Activity -->
         <activity
             android:name=".ChatActivity"
             android:exported="false"
             android:parentActivityName=".MainActivity"
-            android:theme="@style/Theme.OfflineRoutingApp" />
+            android:theme="@style/Theme.OfflineRoutingApp"
+            android:launchMode="singleTop" />
 
+        <!-- Pairing Request Activity -->
+        <activity
+            android:name=".PairingRequestActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Dialog"
+            android:excludeFromRecents="true" />
+
+        <!-- WiFi Direct Foreground Service -->
         <service
             android:name=".service.WifiDirectService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="connectedDevice" />
+            android:foregroundServiceType="connectedDevice"
+            android:stopWithTask="false" />
 
     </application>
+
 </manifest>

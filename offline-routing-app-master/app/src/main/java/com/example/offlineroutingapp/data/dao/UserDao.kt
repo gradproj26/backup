@@ -4,8 +4,6 @@ import androidx.room.*
 import com.example.offlineroutingapp.data.entities.UserEntity
 import kotlinx.coroutines.flow.Flow
 
-
-
 @Dao
 interface UserDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
