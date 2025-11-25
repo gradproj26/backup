@@ -1,0 +1,26 @@
+<resources>
+    <string name="app_name">OfflineRoutingApp</string>
+    <string name="discover_devices">Discover Devices</string>
+    <string name="nearby_devices">Nearby Devices:</string>
+    <string name="permission_required">Nearby devices permission required</string>
+    <string name="search_started">Started searching for devices</string>
+    <string name="discovery_failed">Discovery failed: %1$d</string>
+    <string name="permission_granted">Permission granted</string>
+    <string name="permission_denied">Permission denied, cannot use WiFi Direct</string>
+    <string name="no_devices_found">No devices found</string>
+    <string name="connecting">Connecting...</string>
+    <string name="connected">Connected</string>
+    <string name="disconnected">Disconnected</string>
+    <string name="connection_failed">Connection failed</string>
+    <string name="type_message">Type a message...</string>
+    <string name="send">Send</string>
+    <string name="disconnect">Disconnect</string>
+    <string name="group_owner">Group Owner</string>
+    <string name="client">Client</string>
+
+    <!-- ChatActivity strings -->
+    <string name="back">Back</string>
+    <string name="profile">Profile</string>
+    <string name="user_name">User Name</string>
+    <string name="send_image">Send Image</string>
+</resources>
